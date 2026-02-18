@@ -1,22 +1,43 @@
-# AI Voice Stack (Dictation + Kokoro TTS)
+# AI Voice Stack
 
-Complete local voice workflow for Ubuntu:
-- Push-to-talk dictation into terminal/tmux/chat inputs
-- Dictation provider switch (`faster-whisper`, `openai`, `deepgram`)
-- Local text-to-speech with Kokoro (`hexgrad/Kokoro-82M`) and fallbacks
-- Stable hotkey setup, debouncing, logging, and tmux integration
+Talk to your terminal. Have it talk back.
 
-This repo documents the full working setup and includes the exact scripts currently in use.
+**Hold a key, speak, release** — your words appear at the cursor. Ask your AI
+agent to respond and **hear it out loud** in a natural voice. Everything runs
+locally on your machine. No cloud required, no latency, no subscription.
 
-## Fast Install (One Command)
+- **Push-to-talk dictation** — hold Menu key, speak, release. Text lands in
+  your terminal, tmux pane, or chat input. Works with `faster-whisper` (local),
+  OpenAI, or Deepgram.
+- **Local TTS** — high-quality speech powered by
+  [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (82M params, 50+ voices,
+  8 languages). Falls back to flite and espeak-ng automatically.
+- **Agent skill included** — install the skill and your AI coding agent (Claude
+  Code, Cursor, etc.) learns to speak on its own. No prompt engineering needed.
+- **Zero config** — one command installs everything. Hotkeys, Python envs,
+  audio routing, and tmux integration are handled for you.
 
-From this repo root:
+## Quick Start
 
 ```bash
+git clone https://github.com/Ema93sh/ai-voice-stack.git
+cd ai-voice-stack
 scripts/voice-up-setup.sh --with-system-deps
 ```
 
-If you already installed apt dependencies, use:
+Then:
+
+```bash
+# Speak something
+~/.local/bin/ai-say "Hello from the terminal"
+
+# Hold Menu key → speak → release → text appears at cursor
+
+# Try a different voice
+AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "Voice test"
+```
+
+If you already have the apt dependencies installed:
 
 ```bash
 scripts/voice-up-setup.sh
