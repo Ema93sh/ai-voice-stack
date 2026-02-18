@@ -101,6 +101,14 @@ Edit `~/.config/ai-audio.env` and pin your source/sink names.
 ~/.local/bin/dictation-hotkeys
 ```
 
+## Git Hooks (Optional)
+
+Install the pre-commit hook to run shellcheck on staged bash files:
+
+```bash
+scripts/install-hooks.sh
+```
+
 ## Verify
 
 ```bash

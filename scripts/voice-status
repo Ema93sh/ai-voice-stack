@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$HOME/.config/ai-audio.env" ]; then
+  # shellcheck disable=SC1090
+  . "$HOME/.config/ai-audio.env"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_PATHS=("$SCRIPT_DIR/dictation-lib.sh" "$HOME/.local/lib/dictation-lib.sh")
+for _lib in "${LIB_PATHS[@]}"; do
+  if [ -f "$_lib" ]; then
+    # shellcheck source=scripts/dictation-lib.sh
+    . "$_lib"
+    break
+  fi
+done
+unset _lib
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/dictation"
+LOG_FILE="$STATE_DIR/dictation.log"
+
+printf '=== Voice Stack Status ===\n\n'
+
+# Mic
+if command -v get_mic_source >/dev/null 2>&1; then
+  mic_source="$(get_mic_source)"
+  mic_mute="$(get_mic_mute "$mic_source")"
+  mic_vol="$(get_mic_volume "$mic_source")"
+  mic_state="ON"
+  [ "$mic_mute" != "yes" ] || mic_state="OFF (muted)"
+  printf 'Mic source:  %s\n' "${mic_source:-<not found>}"
+  printf 'Mic state:   %s\n' "$mic_state"
+  printf 'Mic volume:  %s\n' "$mic_vol"
+else
+  printf 'Mic:         dictation-lib not loaded\n'
+fi
+
+# Sink
+sink="${AI_TTS_SINK:-}"
+if [ -z "$sink" ]; then
+  sink="$(pactl get-default-sink 2>/dev/null || echo '<unknown>')"
+fi
+printf 'TTS sink:    %s\n' "$sink"
+
+# xbindkeys
+if pgrep -x xbindkeys >/dev/null 2>&1; then
+  printf 'xbindkeys:   running\n'
+else
+  printf 'xbindkeys:   not running\n'
+fi
+
+# Python venvs
+printf '\n--- Python Environments ---\n'
+dictation_venv="$HOME/.venvs/dictation"
+kokoro_venv="$HOME/.local/share/kokoro-tts/.venv"
+if [ -x "$dictation_venv/bin/python3" ]; then
+  printf 'Dictation:   %s\n' "$dictation_venv"
+else
+  printf 'Dictation:   not found\n'
+fi
+if [ -x "$kokoro_venv/bin/python" ]; then
+  printf 'Kokoro:      %s\n' "$kokoro_venv"
+else
+  printf 'Kokoro:      not found\n'
+fi
+
+# Provider
+provider="${DICTATION_PROVIDER:-faster-whisper}"
+printf '\n--- Dictation Provider ---\n'
+printf 'Provider:    %s\n' "$provider"
+
+# Recent log
+printf '\n--- Recent Log (last 10 lines) ---\n'
+if [ -f "$LOG_FILE" ]; then
+  tail -n 10 "$LOG_FILE"
+else
+  printf '(no log file)\n'
+fi

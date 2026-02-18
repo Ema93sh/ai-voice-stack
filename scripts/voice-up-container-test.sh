@@ -60,8 +60,11 @@ run_quick() {
       scripts/voice-up-setup.sh --skip-python --no-hotkeys --force-config
       test -x /root/.local/bin/ai-say
       test -x /root/.local/bin/transcribe-audio
+      test -x /root/.local/bin/voice-status
+      test -f /root/.local/lib/dictation-lib.sh
       test -f /root/.xbindkeysrc
       test -f /root/.config/ai-audio.env
+      bash -c "source /root/.local/lib/dictation-lib.sh && type get_mic_source"
       echo PASS_QUICK
     '
 }

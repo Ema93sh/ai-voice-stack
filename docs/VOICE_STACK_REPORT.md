@@ -10,7 +10,7 @@ This report documents the implemented Ubuntu voice stack for:
 
 ## Repository
 
-- Repo: `/data/workstation/workspace/ubuntu-voice-hub`
+- Repo: `/data/workstation/workspace/ai-voice-stack`
 - Skill added: `.agents/skills/ai-say`
 
 ## Environment Snapshot

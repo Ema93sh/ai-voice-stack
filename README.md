@@ -94,19 +94,26 @@ Then test:
 - Dictation providers: `faster-whisper` (local), `openai`, `deepgram`
 - TTS model: `Kokoro-82M` (default voice `af_bella`)
 
+## Skill Install
+
+```bash
+npx skills add Ema93sh/ai-voice-stack
+```
+
 ## Repo Layout
 
 - `scripts/`
-  - `voice-up-setup.sh`
-  - `voice-up-container-test.sh`
-  - `dictate-start`
-  - `dictate-stop`
-  - `dictation-hotkeys`
-  - `transcribe_whisper.py`
-  - `transcribe-audio`
-  - `ai-say`
-  - `ai-tts-last`
-  - `kokoro-synthesize.py`
+  - `voice-up-setup.sh` — one-command installer
+  - `voice-up-container-test.sh` — Docker-based validation
+  - `dictation-lib.sh` — shared functions for dictation scripts
+  - `dictate-start` / `dictate-stop` — push-to-talk lifecycle
+  - `dictation-hotkeys` — xbindkeys restart helper
+  - `transcribe_whisper.py` / `transcribe-audio` — STT dispatch
+  - `ai-say` / `ai-tts-last` — TTS entry points
+  - `kokoro-synthesize.py` — Kokoro WAV synthesis
+  - `voice-status` — diagnostic status reporter
+  - `run-tests.sh` — shellcheck + unit tests
+  - `install-hooks.sh` / `pre-commit-hook.sh` — git hooks
 - `config/`
   - `xbindkeysrc.sample`
   - `ai-audio.env.sample`
@@ -121,6 +128,9 @@ Then test:
 ## Daily Commands
 
 ```bash
+# Check stack health
+~/.local/bin/voice-status
+
 # Restart keybindings
 ~/.local/bin/dictation-hotkeys
 
@@ -143,4 +153,4 @@ tail -f ${XDG_RUNTIME_DIR:-/run/user/1000}/dictation/dictation.log
 
 ## License
 
-Use as internal ops/docs unless you add your own license file.
+MIT License. See [LICENSE](LICENSE).

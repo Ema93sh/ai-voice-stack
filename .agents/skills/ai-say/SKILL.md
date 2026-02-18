@@ -1,6 +1,6 @@
 ---
 name: ai-say
-description: Use local ai-say text-to-speech in ubuntu-voice-hub when the user asks to speak text out loud, test audio output, switch Kokoro voices, or debug ai-say playback issues on Ubuntu.
+description: Use local ai-say text-to-speech in ai-voice-stack when the user asks to speak text out loud, test audio output, switch Kokoro voices, or debug ai-say playback issues on Ubuntu.
 ---
 
 # AI Say
@@ -69,6 +69,12 @@ ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=880:duration=3' 
 ```bash
 export AI_KOKORO_GAIN_DB=18
 ~/.local/bin/ai-say "Volume test"
+```
+
+## Install
+
+```bash
+npx skills add Ema93sh/ai-voice-stack
 ```
 
 ## Notes

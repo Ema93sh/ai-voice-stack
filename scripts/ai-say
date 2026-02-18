@@ -55,36 +55,30 @@ printf '%s\n' "$text" | fold -s -w "$CHUNK_CHARS" | while IFS= read -r chunk || 
 
   ok=0
 
+  paplay_args=(--volume=65536 --stream-name="ai-say")
+  if [ -n "$SINK" ]; then
+    paplay_args+=(--device="$SINK")
+  fi
+
   # 1) Preferred path: Kokoro synthesis to WAV, then boosted playback
   if [ -x "$KOKORO_PY" ] && [ -f "$KOKORO_SCRIPT" ] && command -v paplay >/dev/null 2>&1; then
     wav_tmp="$(mktemp "$STATE_DIR/kokoro.XXXXXX.wav")"
+    chunk_tmp="$(mktemp "$STATE_DIR/chunk.XXXXXX.txt")"
+    printf '%s' "$chunk" > "$chunk_tmp"
     if HF_HOME="$KOKORO_HF_HOME" CUDA_VISIBLE_DEVICES="" "$KOKORO_PY" "$KOKORO_SCRIPT" \
-      --text "$chunk" --out "$wav_tmp" --voice "$KOKORO_VOICE" --lang "$KOKORO_LANG" --repo "$KOKORO_REPO" >/dev/null 2>&1; then
+      --text-file "$chunk_tmp" --out "$wav_tmp" --voice "$KOKORO_VOICE" --lang "$KOKORO_LANG" --repo "$KOKORO_REPO" >/dev/null 2>&1; then
       if command -v ffmpeg >/dev/null 2>&1; then
-        if [ -n "$SINK" ]; then
-          if ffmpeg -hide_banner -loglevel error -i "$wav_tmp" -af "volume=${KOKORO_GAIN_DB}dB,alimiter=limit=0.98" -f wav - 2>/dev/null \
-              | paplay --device="$SINK" --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
-            ok=1
-          fi
-        else
-          if ffmpeg -hide_banner -loglevel error -i "$wav_tmp" -af "volume=${KOKORO_GAIN_DB}dB,alimiter=limit=0.98" -f wav - 2>/dev/null \
-              | paplay --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
-            ok=1
-          fi
+        if ffmpeg -hide_banner -loglevel error -i "$wav_tmp" -af "volume=${KOKORO_GAIN_DB}dB,alimiter=limit=0.98" -f wav - 2>/dev/null \
+            | paplay "${paplay_args[@]}" >/dev/null 2>&1; then
+          ok=1
         fi
       else
-        if [ -n "$SINK" ]; then
-          if paplay --device="$SINK" --volume=65536 --stream-name="ai-say" "$wav_tmp" >/dev/null 2>&1; then
-            ok=1
-          fi
-        else
-          if paplay --volume=65536 --stream-name="ai-say" "$wav_tmp" >/dev/null 2>&1; then
-            ok=1
-          fi
+        if paplay "${paplay_args[@]}" "$wav_tmp" >/dev/null 2>&1; then
+          ok=1
         fi
       fi
     fi
-    rm -f "$wav_tmp"
+    rm -f "$wav_tmp" "$chunk_tmp"
   fi
 
   # 2) Fallback: ffmpeg flite
@@ -92,16 +86,9 @@ printf '%s\n' "$text" | fold -s -w "$CHUNK_CHARS" | while IFS= read -r chunk || 
     if command -v ffmpeg >/dev/null 2>&1 && command -v paplay >/dev/null 2>&1; then
       txt_tmp="$(mktemp "$STATE_DIR/text.XXXXXX")"
       printf '%s' "$chunk" > "$txt_tmp"
-      if [ -n "$SINK" ]; then
-        if ffmpeg -hide_banner -loglevel error -f lavfi -i "flite=textfile=$txt_tmp:voice=$VOICE" -af "volume=${GAIN_DB}dB,atempo=${TEMPO}" -f wav - 2>/dev/null \
-            | paplay --device="$SINK" --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
-          ok=1
-        fi
-      else
-        if ffmpeg -hide_banner -loglevel error -f lavfi -i "flite=textfile=$txt_tmp:voice=$VOICE" -af "volume=${GAIN_DB}dB,atempo=${TEMPO}" -f wav - 2>/dev/null \
-            | paplay --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
-          ok=1
-        fi
+      if ffmpeg -hide_banner -loglevel error -f lavfi -i "flite=textfile=$txt_tmp:voice=$VOICE" -af "volume=${GAIN_DB}dB,atempo=${TEMPO}" -f wav - 2>/dev/null \
+          | paplay "${paplay_args[@]}" >/dev/null 2>&1; then
+        ok=1
       fi
       rm -f "$txt_tmp"
     fi
@@ -109,10 +96,6 @@ printf '%s\n' "$text" | fold -s -w "$CHUNK_CHARS" | while IFS= read -r chunk || 
 
   # 3) Last fallback: speech-dispatcher
   if [ "$ok" -ne 1 ]; then
-    if [ -n "$SINK" ]; then
-      PULSE_SINK="$SINK" spd-say -o espeak-ng -i 100 -w -- "$chunk" >/dev/null 2>&1 || true
-    else
-      spd-say -o espeak-ng -i 100 -w -- "$chunk" >/dev/null 2>&1 || true
-    fi
+    env ${SINK:+PULSE_SINK="$SINK"} spd-say -o espeak-ng -i 100 -w -- "$chunk" >/dev/null 2>&1 || true
   fi
 done

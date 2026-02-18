@@ -46,6 +46,25 @@ backup_then_copy() {
   log "installed $dst"
 }
 
+template_and_install() {
+  local src="$1"
+  local dst="$2"
+
+  mkdir -p "$(dirname "$dst")"
+  if [ -f "$dst" ] && [ "$FORCE_CONFIG" -ne 1 ]; then
+    warn "keeping existing $dst (use --force-config to overwrite)"
+    return 0
+  fi
+
+  if [ -f "$dst" ]; then
+    cp "$dst" "$dst.bak.$(date +%Y%m%d%H%M%S)"
+    log "backup created for $dst"
+  fi
+
+  sed "s|__HOME__|$HOME|g" "$src" > "$dst"
+  log "installed $dst (templated)"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --with-system-deps) WITH_SYSTEM_DEPS=1 ;;
@@ -86,6 +105,8 @@ fi
 log "installing scripts into ~/.local/bin"
 mkdir -p "$HOME_BIN" "$KOKORO_HOME"
 
+mkdir -p "$HOME/.local/lib"
+install -m 0644 "$REPO_ROOT/scripts/dictation-lib.sh" "$HOME/.local/lib/dictation-lib.sh"
 install -m 0755 "$REPO_ROOT/scripts/dictate-start" "$HOME_BIN/dictate-start"
 install -m 0755 "$REPO_ROOT/scripts/dictate-stop" "$HOME_BIN/dictate-stop"
 install -m 0755 "$REPO_ROOT/scripts/dictation-hotkeys" "$HOME_BIN/dictation-hotkeys"
@@ -93,11 +114,12 @@ install -m 0755 "$REPO_ROOT/scripts/transcribe_whisper.py" "$HOME_BIN/transcribe
 install -m 0755 "$REPO_ROOT/scripts/transcribe-audio" "$HOME_BIN/transcribe-audio"
 install -m 0755 "$REPO_ROOT/scripts/ai-say" "$HOME_BIN/ai-say"
 install -m 0755 "$REPO_ROOT/scripts/ai-tts-last" "$HOME_BIN/ai-tts-last"
+install -m 0755 "$REPO_ROOT/scripts/voice-status" "$HOME_BIN/voice-status"
 install -m 0755 "$REPO_ROOT/scripts/kokoro-synthesize.py" "$KOKORO_HOME/synthesize.py"
 ln -sf "$HOME_BIN/ai-say" "$HOME_BIN/ai-tts"
 
 log "installing config files"
-backup_then_copy "$REPO_ROOT/config/xbindkeysrc.sample" "$HOME/.xbindkeysrc"
+template_and_install "$REPO_ROOT/config/xbindkeysrc.sample" "$HOME/.xbindkeysrc"
 backup_then_copy "$REPO_ROOT/config/ai-audio.env.sample" "$HOME/.config/ai-audio.env"
 
 if [ "$SKIP_PYTHON" -ne 1 ]; then

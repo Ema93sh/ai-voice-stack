@@ -7,7 +7,7 @@
 - Speak.
 - Release Menu key.
 - Transcribed text is inserted at cursor (tmux-aware).
-- Script then sends Enter/Ctrl+Enter based on context.
+- Script then sends Enter/Ctrl+Enter based on context (unless `DICTATION_AUTO_SUBMIT=0`).
 
 ## Dictation Provider Switch
 
@@ -57,6 +57,24 @@ Speak last tmux assistant block:
 
 ```bash
 ~/.local/bin/ai-tts-last
+```
+
+## Disable Auto-Submit
+
+To insert dictated text without pressing Enter:
+
+```bash
+export DICTATION_AUTO_SUBMIT=0
+```
+
+Add to `~/.config/ai-audio.env` to persist.
+
+## Voice Status
+
+Check the health of mic, sink, hotkeys, and Python environments:
+
+```bash
+~/.local/bin/voice-status
 ```
 
 ## Hotkey Service
