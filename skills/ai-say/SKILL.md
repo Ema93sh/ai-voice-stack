@@ -6,6 +6,7 @@ description: >-
   switch Kokoro voices, or debug TTS playback issues.
   Triggers on "say this", "read aloud", "speak", "TTS", "voice test".
 license: MIT
+compatibility: Requires Ubuntu/Linux with PulseAudio (pactl), ffmpeg, xbindkeys, xdotool, and Python 3
 metadata:
   author: Ema93sh
   version: "1.0.0"
@@ -109,6 +110,24 @@ Test direct tone on a specific sink:
 
 ```bash
 ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=880:duration=3' -f wav - | paplay --device='<sink-name>'
+```
+
+## Subcommands
+
+### Install
+
+Run the full voice stack installer. Finds the repo automatically or clones it:
+
+```bash
+bash scripts/install.sh --with-system-deps
+```
+
+### Doctor
+
+Check installation health — reports PASS/FAIL for every component:
+
+```bash
+bash scripts/doctor.sh
 ```
 
 ## Notes

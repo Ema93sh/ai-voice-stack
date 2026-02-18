@@ -39,6 +39,9 @@ Skip `--with-system-deps` if you already have the apt packages.
 
 # Try a different voice
 AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "Voice test"
+
+# Check installation health
+bash skills/ai-say/scripts/doctor.sh
 ```
 
 ### 3. Give your AI agent a voice
