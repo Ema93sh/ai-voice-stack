@@ -94,10 +94,50 @@ Then test:
 - Dictation providers: `faster-whisper` (local), `openai`, `deepgram`
 - TTS model: `Kokoro-82M` (default voice `af_bella`)
 
-## Skill Install
+## Agent Skill
+
+This repo includes an installable **ai-say** skill that teaches AI coding agents
+(Claude Code, Cursor, Windsurf, etc.) how to use the local TTS stack. Once
+installed, your agent can speak text aloud, switch voices, and debug audio
+issues without you having to explain the commands each time.
+
+### Install the skill
 
 ```bash
 npx skills add Ema93sh/ai-voice-stack
+```
+
+The CLI discovers the `skills/ai-say/` directory, copies its `SKILL.md` into
+your agent's skill store, and makes it available in every session.
+
+### What the agent learns
+
+After installation, your agent knows how to:
+
+- Run `~/.local/bin/ai-say "text"` to speak text out loud
+- Pipe text: `echo "hello" | ~/.local/bin/ai-say`
+- Override voices: `AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "test"`
+- Run `~/.local/bin/voice-status` to diagnose audio issues
+- List available Kokoro voices and adjust gain/volume
+
+### Prerequisites
+
+The voice stack itself must be installed first (the skill only provides the
+agent instructions, not the scripts):
+
+```bash
+git clone https://github.com/Ema93sh/ai-voice-stack.git
+cd ai-voice-stack
+scripts/voice-up-setup.sh --with-system-deps
+```
+
+### Manage skills
+
+```bash
+npx skills list          # show installed skills
+npx skills check         # check for updates
+npx skills update        # update all skills
+npx skills remove ai-say # uninstall
 ```
 
 ## Repo Layout
