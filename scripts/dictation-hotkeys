@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+xset -r 135 || true
+xset -r 147 || true
+pkill xbindkeys 2>/dev/null || true
+exec xbindkeys -f "$HOME/.xbindkeysrc"

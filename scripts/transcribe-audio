@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$HOME/.config/ai-audio.env" ]; then
+  # shellcheck disable=SC1090
+  . "$HOME/.config/ai-audio.env"
+fi
+
+if [ "$#" -lt 1 ]; then
+  echo "usage: transcribe-audio <audio-file>" >&2
+  exit 1
+fi
+
+audio_file="$1"
+if [ ! -s "$audio_file" ]; then
+  exit 0
+fi
+
+provider_raw="${DICTATION_PROVIDER:-faster-whisper}"
+provider="$(printf '%s' "$provider_raw" | tr '[:upper:]' '[:lower:]')"
+
+json_to_text() {
+  local mode="$1"
+  python3 -c '
+import json
+import sys
+
+mode = sys.argv[1]
+data = json.load(sys.stdin)
+text = ""
+
+if mode == "openai":
+    text = (data.get("text") or "").strip()
+elif mode == "deepgram":
+    try:
+        text = (
+            data.get("results", {})
+            .get("channels", [{}])[0]
+            .get("alternatives", [{}])[0]
+            .get("transcript", "")
+            .strip()
+        )
+    except Exception:
+        text = ""
+
+print(text, end="")
+' "$mode"
+}
+
+transcribe_local() {
+  local local_py local_script
+
+  local_py="${DICTATION_LOCAL_PY:-$HOME/.venvs/dictation/bin/python3}"
+  local_script="${DICTATION_LOCAL_SCRIPT:-$HOME/.local/bin/transcribe_whisper.py}"
+
+  if [ ! -x "$local_py" ] && ! command -v "$local_py" >/dev/null 2>&1; then
+    local_py="python3"
+  fi
+
+  if ! command -v "$local_py" >/dev/null 2>&1 && [ ! -x "$local_py" ]; then
+    echo "transcribe-audio: python not found for local provider" >&2
+    return 1
+  fi
+
+  if [ ! -f "$local_script" ]; then
+    echo "transcribe-audio: local script not found: $local_script" >&2
+    return 1
+  fi
+
+  "$local_py" "$local_script" "$audio_file"
+}
+
+transcribe_openai() {
+  local model url response
+
+  if [ -z "${OPENAI_API_KEY:-}" ]; then
+    echo "transcribe-audio: OPENAI_API_KEY is required for DICTATION_PROVIDER=openai" >&2
+    return 1
+  fi
+
+  model="${DICTATION_OPENAI_MODEL:-gpt-4o-mini-transcribe}"
+  url="${DICTATION_OPENAI_URL:-https://api.openai.com/v1/audio/transcriptions}"
+
+  response="$(curl -sS --fail-with-body "$url" \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -F "file=@$audio_file" \
+    -F "model=$model" \
+    -F "response_format=json")"
+
+  printf '%s' "$response" | json_to_text openai
+}
+
+transcribe_deepgram() {
+  local model url_base url response
+
+  if [ -z "${DEEPGRAM_API_KEY:-}" ]; then
+    echo "transcribe-audio: DEEPGRAM_API_KEY is required for DICTATION_PROVIDER=deepgram" >&2
+    return 1
+  fi
+
+  model="${DICTATION_DEEPGRAM_MODEL:-nova-3}"
+  url_base="${DICTATION_DEEPGRAM_URL:-https://api.deepgram.com/v1/listen}"
+  url="${url_base}?model=${model}&punctuate=true&smart_format=true"
+
+  response="$(curl -sS --fail-with-body "$url" \
+    -H "Authorization: Token $DEEPGRAM_API_KEY" \
+    -H "Content-Type: audio/wav" \
+    --data-binary "@$audio_file")"
+
+  printf '%s' "$response" | json_to_text deepgram
+}
+
+case "$provider" in
+  faster-whisper|whisper|local)
+    transcribe_local
+    ;;
+  openai)
+    transcribe_openai
+    ;;
+  deepgram)
+    transcribe_deepgram
+    ;;
+  *)
+    echo "transcribe-audio: unsupported DICTATION_PROVIDER=$provider_raw" >&2
+    echo "supported providers: faster-whisper, openai, deepgram" >&2
+    exit 1
+    ;;
+esac

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$HOME/.config/ai-audio.env" ]; then
+  # shellcheck disable=SC1090
+  . "$HOME/.config/ai-audio.env"
+fi
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/ai-say"
+LOCK_FILE="$STATE_DIR/lock"
+MAX_CHARS="${AI_TTS_MAX_CHARS:-1600}"
+CHUNK_CHARS="${AI_TTS_CHUNK_CHARS:-320}"
+VOICE="${AI_TTS_VOICE:-slt}"
+GAIN_DB="${AI_TTS_GAIN_DB:-16}"
+TEMPO="${AI_TTS_TEMPO:-0.9}"
+SINK="${AI_TTS_SINK:-}"
+mkdir -p "$STATE_DIR"
+
+KOKORO_PY="${AI_KOKORO_PY:-$HOME/.local/share/kokoro-tts/.venv/bin/python}"
+KOKORO_SCRIPT="${AI_KOKORO_SCRIPT:-$HOME/.local/share/kokoro-tts/synthesize.py}"
+KOKORO_VOICE="${AI_KOKORO_VOICE:-af_heart}"
+KOKORO_LANG="${AI_KOKORO_LANG:-a}"
+KOKORO_REPO="${AI_KOKORO_REPO:-hexgrad/Kokoro-82M}"
+KOKORO_HF_HOME="${AI_KOKORO_HF_HOME:-$HOME/.local/share/kokoro-tts/hf-cache}"
+KOKORO_GAIN_DB="${AI_KOKORO_GAIN_DB:-16}"
+
+if [ "$#" -gt 0 ]; then
+  raw_text="$*"
+else
+  raw_text="$(cat)"
+fi
+
+# Strip ANSI/control chars and normalize whitespace.
+text="$(printf '%s' "$raw_text" | sed -E 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g; s/[[:cntrl:]]//g' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+[ -n "$text" ] || exit 0
+
+if [ "${#text}" -gt "$MAX_CHARS" ]; then
+  text="${text:0:$MAX_CHARS}"
+fi
+
+if [ -z "$SINK" ]; then
+  SINK="$(pactl get-default-sink 2>/dev/null || true)"
+fi
+
+if [ -n "$SINK" ]; then
+  pactl set-default-sink "$SINK" >/dev/null 2>&1 || true
+  pactl set-sink-mute "$SINK" 0 >/dev/null 2>&1 || true
+fi
+
+exec 9>"$LOCK_FILE"
+flock 9
+
+printf '%s\n' "$text" | fold -s -w "$CHUNK_CHARS" | while IFS= read -r chunk || [ -n "$chunk" ]; do
+  [ -n "$chunk" ] || continue
+
+  ok=0
+
+  # 1) Preferred path: Kokoro synthesis to WAV, then boosted playback
+  if [ -x "$KOKORO_PY" ] && [ -f "$KOKORO_SCRIPT" ] && command -v paplay >/dev/null 2>&1; then
+    wav_tmp="$(mktemp "$STATE_DIR/kokoro.XXXXXX.wav")"
+    if HF_HOME="$KOKORO_HF_HOME" CUDA_VISIBLE_DEVICES="" "$KOKORO_PY" "$KOKORO_SCRIPT" \
+      --text "$chunk" --out "$wav_tmp" --voice "$KOKORO_VOICE" --lang "$KOKORO_LANG" --repo "$KOKORO_REPO" >/dev/null 2>&1; then
+      if command -v ffmpeg >/dev/null 2>&1; then
+        if [ -n "$SINK" ]; then
+          if ffmpeg -hide_banner -loglevel error -i "$wav_tmp" -af "volume=${KOKORO_GAIN_DB}dB,alimiter=limit=0.98" -f wav - 2>/dev/null \
+              | paplay --device="$SINK" --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
+            ok=1
+          fi
+        else
+          if ffmpeg -hide_banner -loglevel error -i "$wav_tmp" -af "volume=${KOKORO_GAIN_DB}dB,alimiter=limit=0.98" -f wav - 2>/dev/null \
+              | paplay --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
+            ok=1
+          fi
+        fi
+      else
+        if [ -n "$SINK" ]; then
+          if paplay --device="$SINK" --volume=65536 --stream-name="ai-say" "$wav_tmp" >/dev/null 2>&1; then
+            ok=1
+          fi
+        else
+          if paplay --volume=65536 --stream-name="ai-say" "$wav_tmp" >/dev/null 2>&1; then
+            ok=1
+          fi
+        fi
+      fi
+    fi
+    rm -f "$wav_tmp"
+  fi
+
+  # 2) Fallback: ffmpeg flite
+  if [ "$ok" -ne 1 ]; then
+    if command -v ffmpeg >/dev/null 2>&1 && command -v paplay >/dev/null 2>&1; then
+      txt_tmp="$(mktemp "$STATE_DIR/text.XXXXXX")"
+      printf '%s' "$chunk" > "$txt_tmp"
+      if [ -n "$SINK" ]; then
+        if ffmpeg -hide_banner -loglevel error -f lavfi -i "flite=textfile=$txt_tmp:voice=$VOICE" -af "volume=${GAIN_DB}dB,atempo=${TEMPO}" -f wav - 2>/dev/null \
+            | paplay --device="$SINK" --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
+          ok=1
+        fi
+      else
+        if ffmpeg -hide_banner -loglevel error -f lavfi -i "flite=textfile=$txt_tmp:voice=$VOICE" -af "volume=${GAIN_DB}dB,atempo=${TEMPO}" -f wav - 2>/dev/null \
+            | paplay --volume=65536 --stream-name="ai-say" >/dev/null 2>&1; then
+          ok=1
+        fi
+      fi
+      rm -f "$txt_tmp"
+    fi
+  fi
+
+  # 3) Last fallback: speech-dispatcher
+  if [ "$ok" -ne 1 ]; then
+    if [ -n "$SINK" ]; then
+      PULSE_SINK="$SINK" spd-say -o espeak-ng -i 100 -w -- "$chunk" >/dev/null 2>&1 || true
+    else
+      spd-say -o espeak-ng -i 100 -w -- "$chunk" >/dev/null 2>&1 || true
+    fi
+  fi
+done

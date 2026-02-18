@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$HOME/.config/ai-audio.env" ]; then
+  # shellcheck disable=SC1090
+  . "$HOME/.config/ai-audio.env"
+fi
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/dictation"
+PID_FILE="$STATE_DIR/rec.pid"
+WAV_FILE="$STATE_DIR/rec.wav"
+LOG_FILE="$STATE_DIR/dictation.log"
+LOCK_FILE="$STATE_DIR/lock"
+START_MS_FILE="$STATE_DIR/start_ms"
+LAST_DOWN_MS_FILE="$STATE_DIR/last_down_ms"
+MIN_HOLD_MS="${DICTATION_MIN_HOLD_MS:-250}"
+KEYUP_DEBOUNCE_MS="${DICTATION_KEYUP_DEBOUNCE_MS:-120}"
+TMUX_SUBMIT_DELAY_S="${DICTATION_TMUX_SUBMIT_DELAY_S:-0.12}"
+mkdir -p "$STATE_DIR"
+
+get_mic_source() {
+  local src=""
+  local preferred=""
+  if command -v pactl >/dev/null 2>&1; then
+    if [ -n "${DICTATION_SOURCE:-}" ]; then
+      if pactl list short sources | awk '{print $2}' | rg -Fx -- "${DICTATION_SOURCE}" >/dev/null 2>&1; then
+        printf '%s' "${DICTATION_SOURCE}"
+        return
+      fi
+    fi
+
+    preferred="$(pactl list short sources | awk '/HyperX_SoloCast|HyperX SoloCast|usb-HP__Inc_HyperX_SoloCast/ {print $2; exit}')"
+    if [ -n "$preferred" ]; then
+      printf '%s' "$preferred"
+      return
+    fi
+
+    src="$(pactl get-default-source 2>/dev/null || true)"
+    if [ -z "$src" ]; then
+      src="$(pactl info 2>/dev/null | awk -F': ' '/Default Source/ {print $2; exit}' || true)"
+    fi
+  fi
+  printf '%s' "$src"
+}
+
+get_mic_mute() {
+  local src="$1"
+  if [ -z "$src" ] || ! command -v pactl >/dev/null 2>&1; then
+    printf 'unknown'
+    return
+  fi
+  pactl get-source-mute "$src" 2>/dev/null | awk '{print $2}' || printf 'unknown'
+}
+
+get_mic_volume() {
+  local src="$1"
+  if [ -z "$src" ] || ! command -v pactl >/dev/null 2>&1; then
+    printf '?'
+    return
+  fi
+  pactl get-source-volume "$src" 2>/dev/null | awk -F'/' 'NR==1 {gsub(/ /, "", $2); print $2; exit}' || printf '?'
+}
+
+resolve_tmux_pane() {
+  local client_tty pane_id
+
+  command -v tmux >/dev/null 2>&1 || return 1
+
+  client_tty="$(tmux list-clients -F '#{client_tty}' 2>/dev/null | head -n1 || true)"
+  [ -n "$client_tty" ] || return 1
+
+  pane_id="$(tmux display-message -p -t "$client_tty" '#{pane_id}' 2>/dev/null || true)"
+  [ -n "$pane_id" ] || return 1
+
+  printf '%s' "$pane_id"
+}
+
+insert_text_tmux() {
+  local text="$1"
+  local pane_id buffer_name
+
+  pane_id="$(resolve_tmux_pane)" || return 1
+
+  buffer_name="dictation-$$"
+  tmux set-buffer -b "$buffer_name" -- "$text" >/dev/null 2>&1 || return 1
+  tmux paste-buffer -b "$buffer_name" -d -t "$pane_id" >/dev/null 2>&1 || return 1
+}
+
+press_enter_tmux() {
+  local pane_id
+
+  pane_id="$(resolve_tmux_pane)" || return 1
+  sleep "$TMUX_SUBMIT_DELAY_S"
+  tmux send-keys -t "$pane_id" Enter >/dev/null 2>&1 || return 1
+}
+
+insert_text() {
+  local text="$1"
+
+  if insert_text_tmux "$text"; then
+    printf '%s inserted_via_tmux\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+    return 0
+  fi
+
+  if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
+    printf "%s" "$text" | wl-copy
+    ydotool key 29:1 47:1 47:0 29:0
+    printf '%s inserted_via_wayland_paste\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  else
+    xdotool keyup Menu >/dev/null 2>&1 || true
+    xdotool type --clearmodifiers --delay 1 "$text"
+    printf '%s inserted_via_xdotool\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  fi
+}
+
+press_enter() {
+  if press_enter_tmux; then
+    printf '%s enter_via_tmux\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+    return 0
+  fi
+
+  if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
+    ydotool key 29:1 28:1 28:0 29:0
+    printf '%s submit_via_wayland_ctrl_enter\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  else
+    xdotool keyup Menu >/dev/null 2>&1 || true
+    xdotool key ctrl+Return
+    printf '%s submit_via_xdotool_ctrl_enter\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  fi
+}
+
+exec 9>"$LOCK_FILE"
+flock 9
+
+if [ ! -f "$PID_FILE" ]; then
+  exit 0
+fi
+
+pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+  rm -f "$PID_FILE" "$START_MS_FILE"
+  exit 0
+fi
+
+printf '%s stop keyup\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+
+now_ms="$(date +%s%3N)"
+last_down_ms="$(cat "$LAST_DOWN_MS_FILE" 2>/dev/null || echo 0)"
+since_down_ms=$((now_ms - last_down_ms))
+if [ "$since_down_ms" -lt "$KEYUP_DEBOUNCE_MS" ]; then
+  printf '%s ignored_repeat_keyup_ms=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$since_down_ms" >> "$LOG_FILE"
+  exit 0
+fi
+
+start_ms="$(cat "$START_MS_FILE" 2>/dev/null || echo 0)"
+elapsed_ms=$((now_ms - start_ms))
+if [ "$elapsed_ms" -lt "$MIN_HOLD_MS" ]; then
+  printf '%s ignored_short_hold_ms=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$elapsed_ms" >> "$LOG_FILE"
+  exit 0
+fi
+
+kill -INT "$pid" 2>/dev/null || true
+for _ in $(seq 1 40); do
+  kill -0 "$pid" 2>/dev/null || break
+  sleep 0.05
+done
+kill -TERM "$pid" 2>/dev/null || true
+rm -f "$PID_FILE" "$START_MS_FILE"
+
+mic_source="$(get_mic_source)"
+mic_mute="$(get_mic_mute "$mic_source")"
+mic_vol="$(get_mic_volume "$mic_source")"
+mic_state="ON"
+if [ "$mic_mute" = "yes" ]; then
+  mic_state="OFF"
+fi
+printf '%s mic_state=%s source=%s volume=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$mic_state" "${mic_source:-default}" "$mic_vol" >> "$LOG_FILE"
+
+if [ ! -s "$WAV_FILE" ]; then
+  printf '%s no_audio_captured\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  exit 0
+fi
+
+TRANSCRIBE_BIN="${DICTATION_TRANSCRIBE_BIN:-$HOME/.local/bin/transcribe-audio}"
+if ! RAW_TEXT="$("$TRANSCRIBE_BIN" "$WAV_FILE" 2>>"$LOG_FILE")"; then
+  printf '%s transcribe_failed provider=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${DICTATION_PROVIDER:-faster-whisper}" >> "$LOG_FILE"
+  exit 0
+fi
+
+TEXT="$(printf '%s' "$RAW_TEXT" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+
+if [ -z "$TEXT" ]; then
+  printf '%s no_speech_detected\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+  exit 0
+fi
+
+insert_text "$TEXT"
+press_enter
+printf '%s transcription_len=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${#TEXT}" >> "$LOG_FILE"

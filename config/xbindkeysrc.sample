@@ -1,0 +1,12 @@
+# Push-to-talk dictation: Menu key primary/fallback keycodes (no modifier dependency)
+"/home/ema93sh/.local/bin/dictate-start"
+  c:135
+
+"/home/ema93sh/.local/bin/dictate-stop"
+  release + c:135
+
+"/home/ema93sh/.local/bin/dictate-start"
+  c:147
+
+"/home/ema93sh/.local/bin/dictate-stop"
+  release + c:147

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Say"
+  short_description: "Run local Kokoro TTS with ai-say"
+  default_prompt: "Use ai-say to speak text through the configured sink."

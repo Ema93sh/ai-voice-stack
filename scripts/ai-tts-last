@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Optional first arg: explicit tmux pane id (e.g. %2)
+pane_id="${1:-}"
+
+if ! command -v tmux >/dev/null 2>&1; then
+  exit 1
+fi
+
+if [ -z "$pane_id" ]; then
+  client_tty="$(tmux list-clients -F '#{client_activity} #{client_tty}' | sort -nr | head -n1 | awk '{print $2}')"
+  [ -n "$client_tty" ] || exit 1
+  pane_id="$(tmux display-message -p -t "$client_tty" '#{pane_id}')"
+fi
+
+capture="$(tmux capture-pane -ep -t "$pane_id" -S -320)"
+
+spoken="$(printf '%s\n' "$capture" | sed -E 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' | awk '
+  function trim(s) {
+    gsub(/^\s+/, "", s)
+    gsub(/\s+$/, "", s)
+    return s
+  }
+  {
+    line = trim($0)
+
+    if (line ~ /^[╭╰│─]/) next
+    if (line ~ /^\? for shortcuts/) next
+    if (line ~ /^gpt-[0-9]/) next
+    if (line ~ /^Working \(/) next
+    if (line ~ /^model: /) next
+    if (line ~ /^directory: /) next
+    if (line ~ /^› /) next
+
+    if (line == "") {
+      if (block != "") {
+        last = block
+        block = ""
+      }
+      next
+    }
+
+    if (line ~ /^• / || line ~ /^[[:alnum:](\[\"]/ ) {
+      if (block == "") block = line
+      else block = block " " line
+    }
+  }
+  END {
+    if (block != "") last = block
+    print last
+  }
+')"
+
+[ -n "$spoken" ] || exit 0
+"$HOME/.local/bin/ai-tts" "$spoken"
