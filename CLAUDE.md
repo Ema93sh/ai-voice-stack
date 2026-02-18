@@ -16,7 +16,7 @@ Local push-to-talk dictation + Kokoro TTS for Ubuntu.
   - `run-tests.sh` — shellcheck + unit tests
 - `config/` — sample config files (xbindkeysrc, ai-audio.env)
 - `docs/` — setup, usage, env vars, troubleshooting, voices
-- `.agents/skills/ai-say/` — Claude Code skill for TTS
+- `skills/ai-say/` — installable skill for TTS (also mirrored in `.agents/skills/`)
 
 ## Conventions
 

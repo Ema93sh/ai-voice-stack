@@ -114,6 +114,8 @@ npx skills add Ema93sh/ai-voice-stack
   - `voice-status` — diagnostic status reporter
   - `run-tests.sh` — shellcheck + unit tests
   - `install-hooks.sh` / `pre-commit-hook.sh` — git hooks
+- `skills/`
+  - `ai-say/` — installable agent skill for TTS
 - `config/`
   - `xbindkeysrc.sample`
   - `ai-audio.env.sample`
