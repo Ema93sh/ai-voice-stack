@@ -19,13 +19,17 @@ locally on your machine. No cloud required, no latency, no subscription.
 
 ## Quick Start
 
+### 1. Install the voice stack
+
 ```bash
 git clone https://github.com/Ema93sh/ai-voice-stack.git
 cd ai-voice-stack
 scripts/voice-up-setup.sh --with-system-deps
 ```
 
-Then:
+Skip `--with-system-deps` if you already have the apt packages.
+
+### 2. Try it
 
 ```bash
 # Speak something
@@ -37,11 +41,20 @@ Then:
 AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "Voice test"
 ```
 
-If you already have the apt dependencies installed:
+### 3. Give your AI agent a voice
 
 ```bash
-scripts/voice-up-setup.sh
+npx skills add Ema93sh/ai-voice-stack
 ```
+
+This installs the **ai-say** skill into Claude Code, Cursor, Windsurf, or any
+agent that supports the [skills](https://github.com/vercel-labs/skills) format.
+After install, your agent can call `~/.local/bin/ai-say` on its own — it learns
+the commands, the voice catalog, and the debug flow from the skill file.
+
+Ask Claude Code to *"read that back to me"* or *"say hello"* and it will speak
+through your speakers. No prompt engineering, no explaining the commands — the
+skill handles it.
 
 ## Dictation Providers
 
@@ -117,42 +130,16 @@ Then test:
 
 ## Agent Skill
 
-This repo includes an installable **ai-say** skill that teaches AI coding agents
-(Claude Code, Cursor, Windsurf, etc.) how to use the local TTS stack. Once
-installed, your agent can speak text aloud, switch voices, and debug audio
-issues without you having to explain the commands each time.
+Once the skill is installed (`npx skills add Ema93sh/ai-voice-stack`), your
+agent knows how to:
 
-### Install the skill
+- Speak text aloud: `~/.local/bin/ai-say "text"`
+- Pipe output to speech: `echo "hello" | ~/.local/bin/ai-say`
+- Switch voices: `AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "test"`
+- Diagnose audio issues: `~/.local/bin/voice-status`
+- Browse 50+ Kokoro voices and adjust gain/volume
 
-```bash
-npx skills add Ema93sh/ai-voice-stack
-```
-
-The CLI discovers the `skills/ai-say/` directory, copies its `SKILL.md` into
-your agent's skill store, and makes it available in every session.
-
-### What the agent learns
-
-After installation, your agent knows how to:
-
-- Run `~/.local/bin/ai-say "text"` to speak text out loud
-- Pipe text: `echo "hello" | ~/.local/bin/ai-say`
-- Override voices: `AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "test"`
-- Run `~/.local/bin/voice-status` to diagnose audio issues
-- List available Kokoro voices and adjust gain/volume
-
-### Prerequisites
-
-The voice stack itself must be installed first (the skill only provides the
-agent instructions, not the scripts):
-
-```bash
-git clone https://github.com/Ema93sh/ai-voice-stack.git
-cd ai-voice-stack
-scripts/voice-up-setup.sh --with-system-deps
-```
-
-### Manage skills
+Manage installed skills:
 
 ```bash
 npx skills list          # show installed skills
