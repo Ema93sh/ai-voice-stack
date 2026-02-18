@@ -6,6 +6,9 @@ if [ -f "$HOME/.config/ai-audio.env" ]; then
   . "$HOME/.config/ai-audio.env"
 fi
 
+# Dry-run mode: parse and validate input but skip all audio playback
+AI_SAY_DRY_RUN="${AI_SAY_DRY_RUN:-0}"
+
 STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/ai-say"
 LOCK_FILE="$STATE_DIR/lock"
 MAX_CHARS="${AI_TTS_MAX_CHARS:-1600}"
@@ -40,6 +43,10 @@ fi
 
 if [ -z "$SINK" ]; then
   SINK="$(pactl get-default-sink 2>/dev/null || true)"
+fi
+
+if [ "$AI_SAY_DRY_RUN" = "1" ]; then
+  exit 0
 fi
 
 if [ -n "$SINK" ]; then

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -z "${DISPLAY:-}" ]; then
+  for x in /tmp/.X11-unix/X*; do
+    DISPLAY=":${x##*/X}" && break
+  done
+  export DISPLAY
+fi
 xset -r 135 || true
 xset -r 147 || true
 pkill xbindkeys 2>/dev/null || true

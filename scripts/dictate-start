@@ -41,7 +41,6 @@ flock 9
 
 now_ms="$(date +%s%3N)"
 printf '%s start keydown\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
-printf '%s\n' "$now_ms" > "$LAST_DOWN_MS_FILE"
 
 if [ -f "$PID_FILE" ]; then
   pid="$(cat "$PID_FILE" 2>/dev/null || true)"
@@ -52,6 +51,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 rm -f "$PID_FILE" "$START_MS_FILE"
+printf '%s\n' "$now_ms" > "$LAST_DOWN_MS_FILE"
 
 log_mic_state "$LOG_FILE"
 mic_source="$(get_mic_source)"

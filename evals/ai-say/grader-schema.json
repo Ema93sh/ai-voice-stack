@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "triggered": {
+      "type": "boolean",
+      "description": "Whether ai-say was invoked in any command_execution event in the trace"
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "Brief explanation of the verdict"
+    }
+  },
+  "required": ["triggered", "reasoning"],
+  "additionalProperties": false
+}

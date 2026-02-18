@@ -1,0 +1,22 @@
+prompt,should_trigger,category
+"say hello",true,explicit
+"say this out loud: testing one two three",true,explicit
+"read that back to me",true,explicit
+"read this aloud",true,explicit
+"speak this text: welcome to the demo",true,explicit
+"announce the results: all tests passed",true,explicit
+"narrate this paragraph: The quick brown fox jumps over the lazy dog",true,explicit
+"tell me out loud",true,explicit
+"use text to speech to say good morning",true,explicit
+"use TTS for this",true,explicit
+"voice test",true,implicit
+"test audio output",true,implicit
+"switch to a different voice and say hello",true,contextual
+"ai-say is too quiet turn up the volume and test it",true,contextual
+"audio not working",true,contextual
+"transcribe this audio file",false,negative
+"play this mp3",false,negative
+"type what I say",false,negative
+"speech to text",false,negative
+"install audio drivers",false,negative
+"dictate into the terminal",false,negative

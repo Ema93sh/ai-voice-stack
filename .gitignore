@@ -5,3 +5,4 @@ __pycache__/
 *.log
 .env
 .DS_Store
+evals/ai-say/artifacts/

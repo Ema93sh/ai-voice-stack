@@ -2,9 +2,14 @@
 name: ai-say
 description: >-
   Local text-to-speech on Ubuntu using Kokoro TTS with fallbacks.
-  Use when the user asks to speak text out loud, test audio output,
-  switch Kokoro voices, or debug TTS playback issues.
-  Triggers on "say this", "read aloud", "speak", "TTS", "voice test".
+  Use when the user asks you to speak, say, read aloud, announce, or
+  narrate text. Also use for TTS playback testing, switching Kokoro
+  voices, adjusting speech volume, or debugging audio output issues.
+  Triggers: "say this", "say hello", "read that back to me",
+  "read aloud", "speak", "announce", "narrate", "tell me out loud",
+  "hear it out loud", "text to speech", "TTS", "voice test".
+  Do NOT use for: recording audio, transcription, speech-to-text,
+  playing music/media files, or dictation input.
 license: MIT
 compatibility: Requires Ubuntu/Linux with PulseAudio (pactl), ffmpeg, xbindkeys, xdotool, and Python 3
 metadata:
@@ -16,6 +21,28 @@ metadata:
 
 Local text-to-speech via `~/.local/bin/ai-say`. Kokoro-first with flite and
 speech-dispatcher fallbacks. Requires the voice stack to be installed first.
+
+## When to use this
+
+Use this skill when the user wants text spoken aloud through their speakers:
+
+- "say hello", "say this out loud"
+- "read that back to me", "read this aloud"
+- "speak", "announce", "narrate"
+- "text to speech", "TTS"
+- "voice test", "test audio output"
+- "switch voice", "change TTS voice", "try a different voice"
+- "it's too quiet", "adjust volume", "speech volume"
+- "audio not working", "TTS broken", "no sound"
+
+## When NOT to use this
+
+Do not activate for these requests — they belong to other tools:
+
+- **Recording or transcription** — "transcribe this", "speech to text", "STT", "dictate"
+- **Media playback** — "play this mp3", "play music", "open audio file"
+- **Audio hardware** — "install audio drivers", "configure ALSA", "set up Bluetooth speaker"
+- **Dictation input** — "type what I say", "voice input" (that's dictate-start/stop, not ai-say)
 
 ## Prerequisites
 
@@ -129,6 +156,32 @@ Check installation health — reports PASS/FAIL for every component:
 ```bash
 bash scripts/doctor.sh
 ```
+
+## How to use ai-say (process)
+
+Always use `~/.local/bin/ai-say` as the entry point. Never call Kokoro,
+flite, or spd-say directly — `ai-say` handles engine selection, chunking,
+volume boost, and sink routing automatically.
+
+- Pass text as an argument: `~/.local/bin/ai-say "text"`
+- Or pipe text: `echo "text" | ~/.local/bin/ai-say`
+- Override voice with env var: `AI_KOKORO_VOICE=am_fenrir ~/.local/bin/ai-say "text"`
+- For diagnostics, run `~/.local/bin/voice-status` first, then `bash scripts/doctor.sh`
+
+Do NOT:
+- Call `kokoro-synthesize.py` or the Kokoro Python API directly
+- Use `spd-say`, `flite`, `espeak`, or `aplay` directly
+- Modify files under `~/.local/share/kokoro-tts/` unless troubleshooting
+- Speak content the user did not ask to hear
+
+## Definition of done
+
+The skill is working correctly when:
+
+- `~/.local/bin/ai-say "test"` produces audible speech
+- `bash scripts/doctor.sh` reports all checks PASS
+- The agent used `~/.local/bin/ai-say` (not a direct TTS engine call)
+- Only text the user requested was spoken
 
 ## Notes
 

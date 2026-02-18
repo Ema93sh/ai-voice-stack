@@ -87,6 +87,22 @@ else
 fi
 
 echo ""
+echo "=== Skill Evals ==="
+if [ "${RUN_SKILL_EVALS:-0}" = "1" ]; then
+  bash "$REPO_ROOT/evals/ai-say/run-evals.sh"
+else
+  echo "  skipped (set RUN_SKILL_EVALS=1 to enable)"
+fi
+
+echo ""
+echo "=== Codex Skill Evals ==="
+if [ "${RUN_CODEX_EVALS:-0}" = "1" ]; then
+  bash "$REPO_ROOT/evals/ai-say/run-codex-evals.sh"
+else
+  echo "  skipped (set RUN_CODEX_EVALS=1 to enable)"
+fi
+
+echo ""
 echo "=== Results ==="
 echo "Passed: $PASS  Failed: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
