@@ -71,15 +71,8 @@ insert_text() {
     return 0
   fi
 
-  if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
-    printf "%s" "$text" | wl-copy
-    ydotool key 29:1 47:1 47:0 29:0
-    printf '%s inserted_via_wayland_paste\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
-  else
-    xdotool keyup Menu >/dev/null 2>&1 || true
-    xdotool type --clearmodifiers --delay 1 "$text"
-    printf '%s inserted_via_xdotool\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
-  fi
+  plat_insert_text "$text"
+  printf '%s inserted_via_platform\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 }
 
 press_enter() {
@@ -88,14 +81,8 @@ press_enter() {
     return 0
   fi
 
-  if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
-    ydotool key 29:1 28:1 28:0 29:0
-    printf '%s submit_via_wayland_ctrl_enter\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
-  else
-    xdotool keyup Menu >/dev/null 2>&1 || true
-    xdotool key ctrl+Return
-    printf '%s submit_via_xdotool_ctrl_enter\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
-  fi
+  plat_press_enter
+  printf '%s submit_via_platform\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 }
 
 exec 9>"$LOCK_FILE"
@@ -113,7 +100,7 @@ fi
 
 printf '%s stop keyup\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 
-now_ms="$(date +%s%3N)"
+now_ms="$(plat_now_ms)"
 last_down_ms="$(cat "$LAST_DOWN_MS_FILE" 2>/dev/null || echo 0)"
 since_down_ms=$((now_ms - last_down_ms))
 if [ "$since_down_ms" -lt "$KEYUP_DEBOUNCE_MS" ]; then

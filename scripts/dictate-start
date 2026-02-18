@@ -39,7 +39,7 @@ fi
 exec 9>"$LOCK_FILE"
 flock 9
 
-now_ms="$(date +%s%3N)"
+now_ms="$(plat_now_ms)"
 printf '%s start keydown\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
 
 if [ -f "$PID_FILE" ]; then
@@ -56,7 +56,9 @@ printf '%s\n' "$now_ms" > "$LAST_DOWN_MS_FILE"
 log_mic_state "$LOG_FILE"
 mic_source="$(get_mic_source)"
 
-ffmpeg -nostdin -loglevel error -f pulse -i "${mic_source:-default}" -ac 1 -ar 16000 -y "$WAV_FILE" 9>&- >/dev/null 2>&1 &
+# Build platform-specific ffmpeg input args
+mapfile -t rec_args < <(plat_rec_ffmpeg_args "${mic_source:-default}")
+ffmpeg -nostdin -loglevel error "${rec_args[@]}" -ac 1 -ar 16000 -y "$WAV_FILE" 9>&- >/dev/null 2>&1 &
 pid=$!
 echo "$pid" > "$PID_FILE"
 printf '%s\n' "$now_ms" > "$START_MS_FILE"

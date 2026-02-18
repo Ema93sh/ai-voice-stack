@@ -1,0 +1,30 @@
+{
+  "title": "AI Voice Stack — Push-to-Talk Dictation",
+  "rules": [
+    {
+      "description": "Hold right_option for push-to-talk dictation",
+      "manipulators": [
+        {
+          "type": "basic",
+          "from": {
+            "key_code": "right_option",
+            "modifiers": { "optional": ["any"] }
+          },
+          "to": [
+            {
+              "shell_command": "$HOME/.local/bin/dictate-start"
+            }
+          ],
+          "to_after_key_up": [
+            {
+              "shell_command": "$HOME/.local/bin/dictate-stop"
+            }
+          ],
+          "parameters": {
+            "basic.to_if_held_down_threshold_milliseconds": 0
+          }
+        }
+      ]
+    }
+  ]
+}

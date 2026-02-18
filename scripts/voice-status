@@ -39,15 +39,20 @@ fi
 # Sink
 sink="${AI_TTS_SINK:-}"
 if [ -z "$sink" ]; then
-  sink="$(pactl get-default-sink 2>/dev/null || echo '<unknown>')"
+  if command -v plat_get_default_sink >/dev/null 2>&1; then
+    sink="$(plat_get_default_sink)"
+  else
+    sink="$(pactl get-default-sink 2>/dev/null || echo '<unknown>')"
+  fi
 fi
 printf 'TTS sink:    %s\n' "$sink"
 
-# xbindkeys
-if pgrep -x xbindkeys >/dev/null 2>&1; then
-  printf 'xbindkeys:   running\n'
+# Hotkey daemon
+hotkey_name="$(plat_hotkey_process_name 2>/dev/null || echo 'xbindkeys')"
+if command -v plat_hotkey_process_running >/dev/null 2>&1 && plat_hotkey_process_running; then
+  printf '%s:   running\n' "$hotkey_name"
 else
-  printf 'xbindkeys:   not running\n'
+  printf '%s:   not running\n' "$hotkey_name"
 fi
 
 # Python venvs

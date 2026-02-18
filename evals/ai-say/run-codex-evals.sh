@@ -124,15 +124,18 @@ while IFS=',' read -r prompt should_trigger _category; do
 
   # Throttle: wait for a slot when we hit the limit
   if [ "${#pids[@]}" -ge "$MAX_PARALLEL" ]; then
-    wait -n 2>/dev/null || true
-    # Compact finished pids
-    alive=()
-    for p in "${pids[@]}"; do
-      if kill -0 "$p" 2>/dev/null; then
-        alive+=("$p")
-      fi
+    # Poll until a slot opens (compatible with bash 3.2+)
+    while true; do
+      alive=()
+      for p in "${pids[@]}"; do
+        if kill -0 "$p" 2>/dev/null; then
+          alive+=("$p")
+        fi
+      done
+      pids=("${alive[@]}")
+      [ "${#pids[@]}" -ge "$MAX_PARALLEL" ] || break
+      sleep 1
     done
-    pids=("${alive[@]}")
   fi
 done < <(tail -n +2 "$CSV")
 

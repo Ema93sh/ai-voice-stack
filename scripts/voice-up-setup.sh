@@ -11,10 +11,10 @@ usage() {
 Usage: voice-up-setup.sh [options]
 
 Options:
-  --with-system-deps   Install apt packages with sudo
-  --force-config       Overwrite ~/.xbindkeysrc and ~/.config/ai-audio.env
+  --with-system-deps   Install system packages (apt on Linux, brew on macOS)
+  --force-config       Overwrite config files (~/.xbindkeysrc, ~/.config/ai-audio.env)
   --skip-python        Skip Python venv/package setup
-  --no-hotkeys         Do not restart xbindkeys at the end
+  --no-hotkeys         Do not restart xbindkeys at the end (Linux only)
   -h, --help           Show this help
 USAGE
 }
@@ -89,23 +89,40 @@ HOME_BIN="$HOME/.local/bin"
 KOKORO_HOME="$HOME/.local/share/kokoro-tts"
 DICTATION_VENV="$HOME/.venvs/dictation"
 KOKORO_VENV="$KOKORO_HOME/.venv"
+PLATFORM="$(uname -s)"
 
 if [ "$WITH_SYSTEM_DEPS" -eq 1 ]; then
-  if ! command -v sudo >/dev/null 2>&1; then
-    warn "sudo is required for --with-system-deps"
-    exit 1
-  fi
-  log "installing system dependencies"
-  sudo apt update
-  sudo apt install -y \
-    portaudio19-dev python3-venv python3-pip git \
-    xdotool ydotool pulseaudio-utils ffmpeg xbindkeys
+  log "installing system dependencies ($PLATFORM)"
+  case "$PLATFORM" in
+    Linux)
+      if ! command -v sudo >/dev/null 2>&1; then
+        warn "sudo is required for --with-system-deps"
+        exit 1
+      fi
+      sudo apt update
+      sudo apt install -y \
+        portaudio19-dev python3-venv python3-pip git \
+        xdotool ydotool pulseaudio-utils ffmpeg xbindkeys
+      ;;
+    Darwin)
+      if ! command -v brew >/dev/null 2>&1; then
+        warn "Homebrew is required on macOS. Install from https://brew.sh"
+        exit 1
+      fi
+      brew install portaudio python ffmpeg flock
+      ;;
+    *)
+      warn "unsupported platform: $PLATFORM"
+      exit 1
+      ;;
+  esac
 fi
 
 log "installing scripts into ~/.local/bin"
 mkdir -p "$HOME_BIN" "$KOKORO_HOME"
 
 mkdir -p "$HOME/.local/lib"
+install -m 0644 "$REPO_ROOT/scripts/platform-lib.sh" "$HOME/.local/lib/platform-lib.sh"
 install -m 0644 "$REPO_ROOT/scripts/dictation-lib.sh" "$HOME/.local/lib/dictation-lib.sh"
 install -m 0755 "$REPO_ROOT/scripts/dictate-start" "$HOME_BIN/dictate-start"
 install -m 0755 "$REPO_ROOT/scripts/dictate-stop" "$HOME_BIN/dictate-stop"
@@ -119,7 +136,9 @@ install -m 0755 "$REPO_ROOT/scripts/kokoro-synthesize.py" "$KOKORO_HOME/synthesi
 ln -sf "$HOME_BIN/ai-say" "$HOME_BIN/ai-tts"
 
 log "installing config files"
-template_and_install "$REPO_ROOT/config/xbindkeysrc.sample" "$HOME/.xbindkeysrc"
+if [ "$PLATFORM" = "Linux" ]; then
+  template_and_install "$REPO_ROOT/config/xbindkeysrc.sample" "$HOME/.xbindkeysrc"
+fi
 backup_then_copy "$REPO_ROOT/config/ai-audio.env.sample" "$HOME/.config/ai-audio.env"
 
 if [ "$SKIP_PYTHON" -ne 1 ]; then
@@ -145,13 +164,14 @@ if [ "$NO_HOTKEYS" -ne 1 ]; then
   "$HOME_BIN/dictation-hotkeys" || warn "could not restart hotkeys automatically"
 fi
 
-cat <<'DONE'
-
-[voice-up] setup complete
-
-Next:
-1) Edit ~/.config/ai-audio.env if your source/sink names differ.
-2) Test dictation: hold Menu, speak, release.
-3) Test TTS: ~/.local/bin/ai-say "Voice test"
-
-DONE
+log "setup complete"
+echo ""
+echo "Next:"
+echo "1) Edit ~/.config/ai-audio.env if your source/sink names differ."
+if [ "$PLATFORM" = "Darwin" ]; then
+  echo "2) Set up Karabiner-Elements for hotkeys — see docs/MACOS.md"
+else
+  echo "2) Test dictation: hold Menu, speak, release."
+fi
+echo "3) Test TTS: ~/.local/bin/ai-say \"Voice test\""
+echo ""

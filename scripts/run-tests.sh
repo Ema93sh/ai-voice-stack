@@ -44,6 +44,23 @@ fi
 echo ""
 echo "=== Unit Tests ==="
 
+# Test: platform-lib.sh loads and detects platform
+if (
+  # shellcheck source=scripts/platform-lib.sh
+  . "$REPO_ROOT/scripts/platform-lib.sh"
+  [ -n "$PLATFORM" ]
+  type plat_play_wav >/dev/null 2>&1
+  type plat_get_default_sink >/dev/null 2>&1
+  type plat_now_ms >/dev/null 2>&1
+  type plat_tts_fallback >/dev/null 2>&1
+  type plat_insert_text >/dev/null 2>&1
+  type plat_press_enter >/dev/null 2>&1
+); then
+  pass "platform-lib.sh loads and exports functions"
+else
+  fail "platform-lib.sh load"
+fi
+
 # Test: dictation-lib.sh loads and defines functions
 if (
   # shellcheck source=scripts/dictation-lib.sh

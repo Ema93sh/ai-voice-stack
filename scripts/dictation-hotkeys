@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo "dictation-hotkeys is Linux-only (xbindkeys)."
+  echo "On macOS, use Karabiner-Elements — see docs/MACOS.md"
+  exit 0
+fi
+
 if [ -z "${DISPLAY:-}" ]; then
   for x in /tmp/.X11-unix/X*; do
     DISPLAY=":${x##*/X}" && break
